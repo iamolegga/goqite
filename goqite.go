@@ -8,10 +8,20 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	internalsql "maragu.dev/goqite/internal/sql"
 )
+
+//go:embed schema_sqlite.sql
+var sqliteSchema string
+
+//go:embed schema_postgres.sql
+var postgresSchema string
+
+var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 type SQLFlavor int
 
@@ -25,11 +35,13 @@ const (
 const rfc3339Milli = "2006-01-02T15:04:05.000Z07:00"
 
 type NewOpts struct {
-	DB         *sql.DB
-	MaxReceive int // Max receive count for messages before they cannot be received anymore.
-	Name       string
-	SQLFlavor  SQLFlavor
-	Timeout    time.Duration // Default timeout for messages before they can be re-received.
+	DB          *sql.DB
+	MaxReceive  int // Max receive count for messages before they cannot be received anymore.
+	Name        string
+	Schema      string // PostgreSQL schema name (optional, ignored for SQLite).
+	SQLFlavor   SQLFlavor
+	TablePrefix string        // SQLite table name prefix (optional, ignored for PostgreSQL).
+	Timeout     time.Duration // Default timeout for messages before they can be re-received.
 }
 
 // New Queue with the given options.
@@ -66,11 +78,39 @@ func New(opts NewOpts) *Queue {
 		panic("unsupported SQL flavor " + fmt.Sprint(opts.SQLFlavor))
 	}
 
+	if opts.Schema != "" && !validIdentifier.MatchString(opts.Schema) {
+		panic("schema must contain only alphanumeric characters and underscores, and start with a letter or underscore")
+	}
+
+	if opts.TablePrefix != "" && !validIdentifier.MatchString(strings.TrimSuffix(opts.TablePrefix, "_")) {
+		panic("table prefix must contain only alphanumeric characters and underscores, and start with a letter or underscore")
+	}
+
+	table := "goqite"
+	var schema string
+	switch opts.SQLFlavor {
+	case SQLFlavorSQLite:
+		if opts.TablePrefix != "" {
+			prefix := opts.TablePrefix
+			if !strings.HasSuffix(prefix, "_") {
+				prefix += "_"
+			}
+			table = prefix + table
+		}
+	case SQLFlavorPostgreSQL:
+		if opts.Schema != "" {
+			schema = opts.Schema
+			table = schema + "." + table
+		}
+	}
+
 	return &Queue{
 		db:         opts.DB,
 		flavor:     opts.SQLFlavor,
 		name:       opts.Name,
 		maxReceive: opts.MaxReceive,
+		schema:     schema,
+		table:      table,
 		timeout:    opts.Timeout,
 	}
 }
@@ -80,6 +120,8 @@ type Queue struct {
 	flavor     SQLFlavor
 	maxReceive int
 	name       string
+	schema     string
+	table      string
 	timeout    time.Duration
 }
 
@@ -128,13 +170,13 @@ func (q *Queue) SendAndGetIDTx(ctx context.Context, tx *sql.Tx, m Message) (ID, 
 	var id ID
 	switch q.flavor {
 	case SQLFlavorSQLite:
-		query := `insert into goqite (queue, body, timeout, priority) values (?, ?, ?, ?) returning id`
+		query := fmt.Sprintf(`insert into %s (queue, body, timeout, priority) values (?, ?, ?, ?) returning id`, q.table)
 		if err := tx.QueryRowContext(ctx, query, q.name, m.Body, timeout.Format(rfc3339Milli), m.Priority).Scan(&id); err != nil {
 			return "", err
 		}
 
 	case SQLFlavorPostgreSQL:
-		query := `insert into goqite (queue, body, timeout, priority) values ($1, $2, $3, $4) returning id`
+		query := fmt.Sprintf(`insert into %s (queue, body, timeout, priority) values ($1, $2, $3, $4) returning id`, q.table)
 		if err := tx.QueryRowContext(ctx, query, q.name, m.Body, timeout, m.Priority).Scan(&id); err != nil {
 			return "", err
 		}
@@ -163,13 +205,13 @@ func (q *Queue) ReceiveTx(ctx context.Context, tx *sql.Tx) (*Message, error) {
 
 	switch q.flavor {
 	case SQLFlavorSQLite:
-		query := `
-			update goqite
+		query := fmt.Sprintf(`
+			update %[1]s
 			set
 				timeout = ?,
 				received = received + 1
 			where id = (
-				select id from goqite
+				select id from %[1]s
 				where
 					queue = ? and
 					? >= timeout and
@@ -177,7 +219,7 @@ func (q *Queue) ReceiveTx(ctx context.Context, tx *sql.Tx) (*Message, error) {
 				order by priority desc, created
 				limit 1
 			)
-			returning id, body`
+			returning id, body`, q.table)
 
 		if err := tx.QueryRowContext(ctx, query, timeout.Format(rfc3339Milli), q.name, now.Format(rfc3339Milli), q.maxReceive).Scan(&m.ID, &m.Body); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -187,13 +229,13 @@ func (q *Queue) ReceiveTx(ctx context.Context, tx *sql.Tx) (*Message, error) {
 		}
 
 	case SQLFlavorPostgreSQL:
-		query := `
-			update goqite
+		query := fmt.Sprintf(`
+			update %[1]s
 			set
 				timeout = $1,
 				received = received + 1
 			where id = (
-				select id from goqite
+				select id from %[1]s
 				where
 					queue = $2 and
 					$3 >= timeout and
@@ -201,7 +243,7 @@ func (q *Queue) ReceiveTx(ctx context.Context, tx *sql.Tx) (*Message, error) {
 				order by priority desc, created
 				limit 1
 			)
-			returning id, body`
+			returning id, body`, q.table)
 
 		if err := tx.QueryRowContext(ctx, query, timeout, q.name, now, q.maxReceive).Scan(&m.ID, &m.Body); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -262,10 +304,10 @@ func (q *Queue) ExtendTx(ctx context.Context, tx *sql.Tx, id ID, delay time.Dura
 	var err error
 	switch q.flavor {
 	case SQLFlavorSQLite:
-		_, err = tx.ExecContext(ctx, `update goqite set timeout = ? where queue = ? and id = ?`, timeout.Format(rfc3339Milli), q.name, id)
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`update %s set timeout = ? where queue = ? and id = ?`, q.table), timeout.Format(rfc3339Milli), q.name, id)
 
 	case SQLFlavorPostgreSQL:
-		_, err = tx.ExecContext(ctx, `update goqite set timeout = $1 where queue = $2 and id = $3`, timeout, q.name, id)
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`update %s set timeout = $1 where queue = $2 and id = $3`, q.table), timeout, q.name, id)
 	}
 
 	return err
@@ -283,10 +325,10 @@ func (q *Queue) DeleteTx(ctx context.Context, tx *sql.Tx, id ID) error {
 	var err error
 	switch q.flavor {
 	case SQLFlavorSQLite:
-		_, err = tx.ExecContext(ctx, `delete from goqite where queue = ? and id = ?`, q.name, id)
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`delete from %s where queue = ? and id = ?`, q.table), q.name, id)
 
 	case SQLFlavorPostgreSQL:
-		_, err = tx.ExecContext(ctx, `delete from goqite where queue = $1 and id = $2`, q.name, id)
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`delete from %s where queue = $1 and id = $2`, q.table), q.name, id)
 	}
 
 	return err

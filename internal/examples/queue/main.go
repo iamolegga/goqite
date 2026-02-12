@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -25,18 +24,6 @@ func main() {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	// Setup the schema
-	schema, err := os.ReadFile("schema_sqlite.sql")
-	if err != nil {
-		log.Info("Error reading schema:", "error", err)
-		return
-	}
-
-	if _, err := db.Exec(string(schema)); err != nil {
-		log.Info("Error executing schema:", "error", err)
-		return
-	}
-
 	// Create a new queue named "jobs".
 	// You can also customize the message redelivery timeout and maximum receive count,
 	// but here, we use the defaults.
@@ -44,6 +31,12 @@ func main() {
 		DB:   db,
 		Name: "jobs",
 	})
+
+	// Setup the schema
+	if err := q.Setup(context.Background()); err != nil {
+		log.Info("Error setting up schema", "error", err)
+		return
+	}
 
 	// Send a message to the queue.
 	// Note that the body is an arbitrary byte slice, so you can decide

@@ -3,30 +3,16 @@ package testing
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"math/rand/v2"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-
-	internalsql "maragu.dev/goqite/internal/sql"
 )
-
-//go:embed schema_postgres.sql
-var postgresSchema string
-
-var once sync.Once
 
 // NewPostgreSQLDB for testing.
 func NewPostgreSQLDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	once.Do(func() {
-		migrateTemplate1(t)
-	})
 
 	adminDB, adminClose := connect(t, "postgres")
 
@@ -45,42 +31,6 @@ func NewPostgreSQLDB(t *testing.T) *sql.DB {
 	})
 
 	return db
-}
-
-func migrateTemplate1(t *testing.T) {
-	t.Helper()
-
-	db, close := connect(t, "template1")
-	defer close(t)
-
-	for err := db.PingContext(t.Context()); err != nil; {
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	err := internalsql.InTx(t.Context(), db, func(tx *sql.Tx) error {
-		var exists bool
-		query := `select exists (select from information_schema.tables where table_name = 'goqite')`
-		if err := tx.QueryRowContext(t.Context(), query).Scan(&exists); err != nil {
-			return err
-		}
-
-		if exists {
-			return nil
-		}
-
-		if _, err := tx.ExecContext(t.Context(), postgresSchema); err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func connect(t *testing.T, name string) (*sql.DB, func(t *testing.T)) {
