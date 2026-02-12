@@ -9,8 +9,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"maragu.dev/goqite"
-	"maragu.dev/goqite/jobs"
+	"github.com/iamolegga/goqite"
+	"github.com/iamolegga/goqite/jobs"
 )
 
 func main() {

@@ -15,9 +15,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"maragu.dev/is"
 
-	"maragu.dev/goqite"
-	qhttp "maragu.dev/goqite/http"
-	internaltesting "maragu.dev/goqite/internal/testing"
+	"github.com/iamolegga/goqite"
+	qhttp "github.com/iamolegga/goqite/http"
+	internaltesting "github.com/iamolegga/goqite/internal/testing"
 )
 
 type wrapper struct {

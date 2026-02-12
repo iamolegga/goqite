@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"text/template"
 
-	internalsql "maragu.dev/goqite/internal/sql"
+	internalsql "github.com/iamolegga/goqite/internal/sql"
 )
 
 type schemaData struct {

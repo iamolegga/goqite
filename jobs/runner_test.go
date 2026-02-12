@@ -11,10 +11,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"maragu.dev/is"
 
-	"maragu.dev/goqite"
-	internalsql "maragu.dev/goqite/internal/sql"
-	internaltesting "maragu.dev/goqite/internal/testing"
-	"maragu.dev/goqite/jobs"
+	"github.com/iamolegga/goqite"
+	internalsql "github.com/iamolegga/goqite/internal/sql"
+	internaltesting "github.com/iamolegga/goqite/internal/testing"
+	"github.com/iamolegga/goqite/jobs"
 )
 
 func TestRunner_Register(t *testing.T) {

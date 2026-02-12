@@ -11,8 +11,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"maragu.dev/is"
 
-	"maragu.dev/goqite"
-	internaltesting "maragu.dev/goqite/internal/testing"
+	"github.com/iamolegga/goqite"
+	internaltesting "github.com/iamolegga/goqite/internal/testing"
 )
 
 func TestQueue(t *testing.T) {

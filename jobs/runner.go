@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"maragu.dev/goqite"
+	"github.com/iamolegga/goqite"
 )
 
 // NewRunnerOpts are options for [NewRunner].

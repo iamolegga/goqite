@@ -9,7 +9,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 
-	"maragu.dev/goqite"
+	"github.com/iamolegga/goqite"
 )
 
 func Run(t *testing.T, name string, timeout time.Duration, f func(t *testing.T, db *sql.DB, q *goqite.Queue)) {

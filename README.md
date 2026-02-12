@@ -2,16 +2,15 @@
 
 <img src="docs/logo.png" alt="Logo" width="300" align="right">
 
-[![GoDoc](https://pkg.go.dev/badge/maragu.dev/goqite)](https://pkg.go.dev/maragu.dev/goqite)
-[![CI](https://github.com/maragudk/goqite/actions/workflows/ci.yml/badge.svg)](https://github.com/maragudk/goqite/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/maragudk/goqite/graph/badge.svg?token=DxGkk2lLHF)](https://codecov.io/gh/maragudk/goqite)
+[![GoDoc](https://pkg.go.dev/badge/github.com/iamolegga/goqite)](https://pkg.go.dev/github.com/iamolegga/goqite)
+[![CI](https://github.com/iamolegga/goqite/actions/workflows/ci.yml/badge.svg)](https://github.com/iamolegga/goqite/actions/workflows/ci.yml)
 
 goqite (pronounced Go-queue-ite) is a persistent message queue Go library built on SQLite and inspired by AWS SQS (but much simpler).
 
 Also supports Postgres!
 
 ```shell
-go get maragu.dev/goqite
+go get github.com/iamolegga/goqite
 ```
 
 Made with ✨sparkles✨ by [maragu](https://www.maragu.dev/): independent software consulting for cloud-native Go apps & AI engineering.
@@ -46,7 +45,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"maragu.dev/goqite"
+	"github.com/iamolegga/goqite"
 )
 
 func main() {
@@ -125,8 +124,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"maragu.dev/goqite"
-	"maragu.dev/goqite/jobs"
+	"github.com/iamolegga/goqite"
+	"github.com/iamolegga/goqite/jobs"
 )
 
 func main() {
@@ -238,7 +237,7 @@ $ make benchmark
 go test -cpu 1,2,4,8,16 -bench=.
 goos: darwin
 goarch: arm64
-pkg: github.com/maragudk/goqite
+pkg: github.com/iamolegga/goqite
 BenchmarkQueue/send,_receive,_delete            	   21444	     54262 ns/op
 BenchmarkQueue/send,_receive,_delete-2          	   17278	     68615 ns/op
 BenchmarkQueue/send,_receive,_delete-4          	   16092	     73888 ns/op

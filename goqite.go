@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	internalsql "maragu.dev/goqite/internal/sql"
+	internalsql "github.com/iamolegga/goqite/internal/sql"
 )
 
 //go:embed schema_sqlite.sql

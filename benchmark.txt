@@ -2,7 +2,7 @@ $ make benchmark
 go test -cpu 1,2,4,8,16 -bench=.
 goos: darwin
 goarch: arm64
-pkg: github.com/maragudk/goqite
+pkg: github.com/iamolegga/goqite
 BenchmarkQueue/send,_receive,_delete            	   21444	     54262 ns/op
 BenchmarkQueue/send,_receive,_delete-2          	   17278	     68615 ns/op
 BenchmarkQueue/send,_receive,_delete-4          	   16092	     73888 ns/op
@@ -44,4 +44,4 @@ BenchmarkQueue/receive_and_delete_message_on_a_big_table_with_multiple_queues/cr
 BenchmarkQueue/receive_and_delete_message_on_a_big_table_with_multiple_queues/create_index_goqite_queue_timeout_created_idx_on_goqite_(queue,_timeout,_created);-8                            	     195	   6883243 ns/op
 BenchmarkQueue/receive_and_delete_message_on_a_big_table_with_multiple_queues/create_index_goqite_queue_timeout_created_idx_on_goqite_(queue,_timeout,_created);-16                           	     169	   6072513 ns/op
 PASS
-ok  	github.com/maragudk/goqite	581.129s
+ok  	github.com/iamolegga/goqite	581.129s

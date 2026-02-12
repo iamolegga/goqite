@@ -1,4 +1,4 @@
-module maragu.dev/goqite
+module github.com/iamolegga/goqite
 
 go 1.24.0
 

@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"maragu.dev/goqite"
+	"github.com/iamolegga/goqite"
 )
 
 func main() {
