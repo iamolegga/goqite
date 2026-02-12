@@ -24,6 +24,8 @@ Made with ✨sparkles✨ by [maragu](https://www.maragu.dev/): independent softw
 - Messages are sent to and received from the queue, and are guaranteed to not be redelivered before a timeout occurs.
 - Support for multiple queues in one table.
 - Message timeouts can be extended, to support e.g. long-running tasks.
+- Automatic, idempotent schema setup with `Setup()`.
+- Isolation via PostgreSQL schema name or SQLite table prefix.
 - A job runner abstraction is provided on top of the queue, for your background tasks.
 - A simple HTTP handler is provided for your convenience.
 - No non-test dependencies. Bring your own SQL driver.
@@ -40,7 +42,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -60,18 +61,6 @@ func main() {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	// Setup the schema
-	schema, err := os.ReadFile("schema_sqlite.sql")
-	if err != nil {
-		log.Info("Error reading schema:", "error", err)
-		return
-	}
-
-	if _, err := db.Exec(string(schema)); err != nil {
-		log.Info("Error executing schema:", "error", err)
-		return
-	}
-
 	// Create a new queue named "jobs".
 	// You can also customize the message redelivery timeout and maximum receive count,
 	// but here, we use the defaults.
@@ -79,6 +68,12 @@ func main() {
 		DB:   db,
 		Name: "jobs",
 	})
+
+	// Setup the schema
+	if err := q.Setup(context.Background()); err != nil {
+		log.Info("Error setting up schema", "error", err)
+		return
+	}
 
 	// Send a message to the queue.
 	// Note that the body is an arbitrary byte slice, so you can decide
@@ -126,7 +121,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -147,23 +141,17 @@ func main() {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	// Setup the schema
-	schema, err := os.ReadFile("schema_sqlite.sql")
-	if err != nil {
-		log.Info("Error reading schema:", "error", err)
-		return
-	}
-
-	if _, err := db.Exec(string(schema)); err != nil {
-		log.Info("Error executing schema:", "error", err)
-		return
-	}
-
 	// Make a new queue for the jobs. You can have as many of these as you like, just name them differently.
 	q := goqite.New(goqite.NewOpts{
 		DB:   db,
 		Name: "jobs",
 	})
+
+	// Setup the schema
+	if err := q.Setup(context.Background()); err != nil {
+		log.Info("Error setting up schema", "error", err)
+		return
+	}
 
 	// Make a job runner with a job limit of 1 and a short message poll interval.
 	r := jobs.NewRunner(jobs.NewRunnerOpts{
@@ -206,67 +194,38 @@ q := goqite.New(goqite.NewOpts{
 	Name:      "jobs",
 	SQLFlavor: goqite.SQLFlavorPostgreSQL,
 })
+
+if err := q.Setup(ctx); err != nil {
+	log.Fatal(err)
+}
 ```
 
-Make sure to use the PostgreSQL schema provided below when setting up your database.
+## Isolation
 
-## Schemas
+You can isolate goqite database objects to avoid name collisions with other tables or multiple goqite instances.
 
-<details>
-	<summary>SQLite</summary>
+For **PostgreSQL**, use the `Schema` option to create all objects in a dedicated schema:
 
-```sql
-create table goqite (
-  id text primary key default ('m_' || lower(hex(randomblob(16)))),
-  created text not null default (strftime('%Y-%m-%dT%H:%M:%fZ')),
-  updated text not null default (strftime('%Y-%m-%dT%H:%M:%fZ')),
-  queue text not null,
-  body blob not null,
-  timeout text not null default (strftime('%Y-%m-%dT%H:%M:%fZ')),
-  received integer not null default 0
-) strict;
-
-create trigger goqite_updated_timestamp after update on goqite begin
-  update goqite set updated = strftime('%Y-%m-%dT%H:%M:%fZ') where id = old.id;
-end;
-
-create index goqite_queue_created_idx on goqite (queue, created);
+```go
+q := goqite.New(goqite.NewOpts{
+	DB:        db,
+	Name:      "jobs",
+	SQLFlavor: goqite.SQLFlavorPostgreSQL,
+	Schema:    "myapp",  // creates myapp.goqite, myapp.goqite_update_timestamp(), etc.
+})
 ```
 
-</details>
+For **SQLite**, use the `TablePrefix` option to prefix all object names:
 
-<details>
-	<summary>PostgreSQL</summary>
-
-```sql
-create extension if not exists pgcrypto;
-
-create function update_timestamp()
-returns trigger as $$
-begin
-   new.updated = now();
-   return new;
-end;
-$$ language plpgsql;
-
-create table goqite (
-  id text primary key default ('m_' || encode(gen_random_bytes(16), 'hex')),
-  created timestamptz not null default now(),
-  updated timestamptz not null default now(),
-  queue text not null,
-  body bytea not null,
-  timeout timestamptz not null default now(),
-  received integer not null default 0
-);
-
-create trigger goqite_updated_timestamp
-before update on goqite
-for each row execute procedure update_timestamp();
-
-create index goqite_queue_created_idx on goqite (queue, created);
+```go
+q := goqite.New(goqite.NewOpts{
+	DB:          db,
+	Name:        "jobs",
+	TablePrefix: "myapp",  // creates myapp_goqite table, myapp_goqite_updated_timestamp trigger, etc.
+})
 ```
 
-</details>
+If the prefix already ends with `_`, no extra underscore is added.
 
 ## Benchmarks
 

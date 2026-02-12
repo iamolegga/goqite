@@ -1,14 +1,18 @@
 create extension if not exists pgcrypto;
 
-create function update_timestamp()
-returns trigger as $$
+{{- if .Schema}}
+create schema if not exists {{.Schema}};
+{{end}}
+
+create or replace function {{.Function}}()
+returns trigger as $func$
 begin
    new.updated = now();
    return new;
 end;
-$$ language plpgsql;
+$func$ language plpgsql;
 
-create table goqite (
+create table if not exists {{.Table}} (
   id text primary key default ('m_' || encode(gen_random_bytes(16), 'hex')),
   created timestamptz not null default now(),
   updated timestamptz not null default now(),
@@ -19,8 +23,10 @@ create table goqite (
   priority integer not null default 0
 );
 
-create trigger goqite_updated_timestamp
-before update on goqite
-for each row execute procedure update_timestamp();
+drop trigger if exists {{.Trigger}} on {{.Table}};
 
-create index goqite_queue_priority_created_idx on goqite (queue, priority desc, created);
+create trigger {{.Trigger}}
+before update on {{.Table}}
+for each row execute procedure {{.Function}}();
+
+create index if not exists {{.Index}} on {{.Table}} (queue, priority desc, created);

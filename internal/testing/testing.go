@@ -35,7 +35,11 @@ func NewQ(t testing.TB, opts goqite.NewOpts) *goqite.Queue {
 		opts.Name = "test"
 	}
 
-	return goqite.New(opts)
+	q := goqite.New(opts)
+	if err := q.Setup(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return q
 }
 
 type Logger func(msg string, args ...any)

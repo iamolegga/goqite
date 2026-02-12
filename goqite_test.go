@@ -328,7 +328,7 @@ func TestQueue_ReceiveAndWait(t *testing.T) {
 
 func BenchmarkQueue(b *testing.B) {
 	b.Run("send, receive, delete", func(b *testing.B) {
-		q := internaltesting.NewQ(b, goqite.NewOpts{})
+		q := internaltesting.NewQ(b, goqite.NewOpts{DB: internaltesting.NewSQLiteDB(b)})
 
 		b.ResetTimer()
 
@@ -375,7 +375,7 @@ func BenchmarkQueue(b *testing.B) {
 
 				var queues []*goqite.Queue
 				for i := range 10 {
-					queues = append(queues, internaltesting.NewQ(b, goqite.NewOpts{Name: fmt.Sprintf("q%v", i)}))
+					queues = append(queues, internaltesting.NewQ(b, goqite.NewOpts{DB: db, Name: fmt.Sprintf("q%v", i)}))
 				}
 
 				for range 100_000 {
